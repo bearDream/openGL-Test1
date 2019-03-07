@@ -1,6 +1,5 @@
 //
 //  shader.hpp
-//  openGL-T9-3D
 //
 //  Created by Lax Zhang on 2019/2/27.
 //  Copyright © 2019 Lax Zhang. All rights reserved.

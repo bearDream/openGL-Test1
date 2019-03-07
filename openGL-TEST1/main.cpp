@@ -35,19 +35,18 @@ void renderScene(Shader &shader);
 void renderLightSource(Shader &shader);
 void renderText(Shader &shader, string text, GLfloat x, GLfloat y, GLfloat scale, glm::vec3 color);
 
+// basic params
 const int window_width = 1280;
 const int  window_height = 720;
 int retina_width, retina_height;  // 一般而言，retina显示屏则将宽高乘2即可解决
 GLFWwindow *window;
+bool is_mouse = false;
 
 // camera
 Camera camera(glm::vec3(-0.54f, 0.54f, 10.39f));
 float lastX = window_width / 2;
 float lastY = window_height / 2;
 bool firstMouse = true;
-
-// can move object
-glm::vec3 heroBoxTrans = glm::vec3(1.0);
 
 // font manage.
 FontsManager fontsManager;
@@ -56,6 +55,11 @@ FontsManager fontsManager;
 float initial_time, deltaTime =0.0f;
 float lastTime = 0.0f;
 int frame = 0, frameCount = 0;
+
+// control var.
+float scale_ball = 0.5;
+float rotate_ball = 0.5;
+glm::vec3 move_box = glm::vec3(0.2f, 0.0f, 0.2);
 
 GLuint Fl_VAO, Fl_VBO, cube_VAO, cube_VBO, lighterVAO, sphereVAO, sphereVBO, sphereEBO, TextVAO, Text_VBO;
 vector<GLuint> sphere_indices;
@@ -105,14 +109,17 @@ int main(int argc, const char * argv[]) {
         // 5.4 渲染太阳(光源)
         renderLightSource(lampShader);
         
-        // 4. 渲染字体
+        // 5.5. 渲染字体(字体位置不能超出window的宽高)
         renderText(textShader, "Press <ctrl> to call out Mouse", 840.0f, 25.0f, 0.5f, glm::vec3(1.0, 1.0, 1.0));
         renderText(textShader, "Press <ESC> to exit this Demo", 840.0f, 75.0f, 0.5f, glm::vec3(1.0, 1.0, 1.0));
         renderText(textShader, "Press <W><A><S><D> to move out camera", 840.0f, 50.0f, 0.5f, glm::vec3(1.0, 1.0, 1.0));
         renderText(textShader, "FPS: " + to_string(frame), 25.0f, 25.0f, 0.5f, glm::vec3(1.0, 1.0, 1.0));
-        renderText(textShader, "Camera position: (" + to_string(camera.camPos.x).append(",") + to_string(camera.camPos.y).append(",") + to_string(camera.camPos.z).append(")"), 25.0f, 580.0f, 0.5f, glm::vec3(1.0, 1.0, 1.0));
+        renderText(textShader, "Camera position: (" +
+            to_string(camera.camPos.x).substr(0, to_string(camera.camPos.x).find(".")+3).append(",") +
+            to_string(camera.camPos.y).substr(0, to_string(camera.camPos.y).find(".")+3).append(",") +
+            to_string(camera.camPos.z).substr(0, to_string(camera.camPos.z).find(".")+3).append(")"),
+            10.0f, 705.0f, 0.3f, glm::vec3(1.0, 1.0, 1.0));
 
-        
         glfwSwapBuffers(window); // 颜色缓冲交换
         glfwPollEvents(); // 处理事件
     }
@@ -175,8 +182,8 @@ void renderScene(Shader &shader){
     
     // 渲染箱子物体
     model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(0.2f, 0.0f, 0.2));
-    model = glm::translate(model, glm::vec3((sin(glfwGetTime())*3.0), 0.0f, (cos(glfwGetTime()))*3.0));
+//    model = glm::translate(model, glm::vec3((sin(glfwGetTime())*3.0), 0.0f, (cos(glfwGetTime()))*3.0));
+    model = glm::translate(model, move_box);
     shader.setMat4("model", model);
     glBindVertexArray(cube_VAO);
     glActiveTexture(GL_TEXTURE0);
@@ -187,7 +194,8 @@ void renderScene(Shader &shader){
     // 渲染球体
     model = glm::mat4(1.0f);
     model = glm::translate(model, glm::vec3(0.8f, 0.0f, 1.3f));
-    model = glm::scale(model, glm::vec3(sin(glfwGetTime())));
+    model = glm::scale(model, glm::vec3(scale_ball));
+    model = glm::rotate(model, rotate_ball * glm::radians(55.0f), glm::vec3(1.0f, 0.3f, 0.5f));
     shader.use();
     shader.setMat4("model", model);
     glBindVertexArray(sphereVAO);
@@ -271,13 +279,13 @@ int init(){
     // 处理字体
     fontsManager.load_fonts(font_roman);
     glEnable(GL_BLEND);
-    glEnable(GL_CULL_FACE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
     // 获取实际窗口大小
     glfwGetFramebufferSize(window, &retina_width, &retina_height);
     // 若不启用 GL_DEPTH_TEST 则会出现物体的后静和前景覆盖的问题
     glEnable(GL_DEPTH_TEST);
+    //    glEnable(GL_CULL_FACE);
     return 0;
 }
 
@@ -374,7 +382,8 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height){
 }
 
 void processInput(GLFWwindow *window){
-    float objMoveSpeed = 1.0 * deltaTime;
+    float speed = 2.5 * deltaTime;
+    float current = glfwGetTime();
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
@@ -385,11 +394,39 @@ void processInput(GLFWwindow *window){
         camera.processKeyboard(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         camera.processKeyboard(RIGHT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);  // 设置窗口获取焦点
+    if (glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS)
+        scale_ball += 0.5 * speed;
+    if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
+        scale_ball -= 0.5 * speed;
+    if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS)
+        rotate_ball += sin(5.0 * speed);
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+        move_box.z += 0.9 * speed;
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+        move_box.z -= 0.9 * speed;
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+        move_box.x -= 0.9 * speed;
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+        move_box.x += 0.9 * speed;
+    // 限制每秒钟只能呼出1次，否则可能会呼出无数次
+    if ( current - initial_time >= 1.0 ){
+        if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS){
+            if (is_mouse){
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);  // 设置窗口获取焦点
+                is_mouse = false;
+            }else{
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);  // 设置窗口获取焦点
+                is_mouse = true;
+            }
+        }
+    }
 }
 
 void mouseCallback(GLFWwindow* window, double x_pos, double y_pos){
+    // 若呼出鼠标则应该禁用摄像机移动
+    if(is_mouse){
+        return;
+    }
     if (firstMouse) {
         lastX = x_pos;
         lastY = y_pos;

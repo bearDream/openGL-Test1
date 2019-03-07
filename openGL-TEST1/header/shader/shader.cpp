@@ -1,6 +1,5 @@
 //
 //  shader.cpp
-//  openGL-T6
 //
 //  Created by Lax Zhang on 2019/2/23.
 //  Copyright © 2019 Lax Zhang. All rights reserved.
